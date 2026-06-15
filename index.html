@@ -3,1118 +3,851 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 플래너 - 달력 일정 관리 앱</title>
+    <title>하루기록 - 달력 일기장</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts Inter & Noto Sans KR -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <!-- React & Babel CDN for elegant single-file client application -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Lucide Icons (SVG 기반 아이콘 사용을 위함) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts (Noto Sans KR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', 'Noto Sans KR', sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
         }
-        /* Custom scrollbar styling for slick look */
+        /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: transparent;
+            background: #f1f5f9;
         }
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .dark ::-webkit-scrollbar-thumb {
-            background: #475569;
+            border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 transition-colors duration-200 dark:bg-slate-900 dark:text-slate-100">
-    <div id="root"></div>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+    <!-- 상단 네비게이션 바 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">하루기록</h1>
+                    <p class="text-xs text-slate-500">달력으로 채워가는 나의 소중한 일상</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <!-- 백업/복원 버튼 -->
+                <button id="btnBackup" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200" title="데이터 백업">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                </button>
+                <button id="btnRestore" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200" title="데이터 복원">
+                    <i data-lucide="upload" class="w-5 h-5"></i>
+                </button>
+                <input type="file" id="fileInput" class="hidden" accept=".json">
+            </div>
+        </div>
+    </header>
 
-        // 기본 제공 카테고리 정의
-        const CATEGORIES = {
-            work: { id: 'work', label: '업무', color: 'bg-blue-500 text-white border-blue-600', dot: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30' },
-            personal: { id: 'personal', label: '개인', color: 'bg-emerald-500 text-white border-emerald-600', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-            family: { id: 'family', label: '가족', color: 'bg-pink-500 text-white border-pink-600', dot: 'bg-pink-500', text: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-50 dark:bg-pink-950/30' },
-            learning: { id: 'learning', label: '학습', color: 'bg-purple-500 text-white border-purple-600', dot: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/30' },
-            other: { id: 'other', label: '기타', color: 'bg-amber-500 text-white border-amber-600', dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30' }
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 왼쪽: 달력 및 검색 영역 (lg:col-span-7) -->
+        <section class="lg:col-span-7 space-y-6">
+            <!-- 달력 카드 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                <!-- 달력 헤더 -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center space-x-2">
+                        <h2 id="calendarTitle" class="text-xl font-bold text-slate-900">2026년 6월</h2>
+                        <button id="btnToday" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full font-medium transition-colors">
+                            오늘
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button id="btnPrevMonth" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                        </button>
+                        <button id="btnNextMonth" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 요일 표시 -->
+                <div class="grid grid-cols-7 gap-1 text-center font-medium text-xs text-slate-400 mb-2">
+                    <div class="text-red-500 py-2">일</div>
+                    <div class="py-2">월</div>
+                    <div class="py-2">화</div>
+                    <div class="py-2">수</div>
+                    <div class="py-2">목</div>
+                    <div class="py-2">금</div>
+                    <div class="text-blue-500 py-2">토</div>
+                </div>
+
+                <!-- 날짜 그리드 -->
+                <div id="calendarDays" class="grid grid-cols-7 gap-1">
+                    <!-- JS로 동적 생성 -->
+                </div>
+            </div>
+
+            <!-- 검색 및 통계 카드 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="search" class="w-4 h-4 text-indigo-500"></i>
+                        일기 검색하기
+                    </h3>
+                    <span id="searchCount" class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium hidden">
+                        0개의 일기
+                    </span>
+                </div>
+                <div class="relative mb-4">
+                    <input type="text" id="searchInput" placeholder="키워드나 감정을 검색해 보세요..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm transition-all">
+                    <i data-lucide="search" class="absolute left-3.5 top-3 w-4 h-4 text-slate-400"></i>
+                </div>
+                <!-- 검색 결과 리스트 -->
+                <div id="searchResults" class="space-y-2 max-h-48 overflow-y-auto hidden">
+                    <!-- JS 검색 결과 동적 추가 -->
+                </div>
+                <div id="searchPlaceholder" class="text-center py-6 text-slate-400 text-xs">
+                    작성된 일기 내용이나 제목을 입력해 보세요.
+                </div>
+            </div>
+        </section>
+
+        <!-- 오른쪽: 일기 에디터 및 뷰어 영역 (lg:col-span-5) -->
+        <section class="lg:col-span-5">
+            <!-- 일기 작성/편집 폼 카드 -->
+            <div id="diaryCard" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sticky top-24 transition-all duration-300">
+                
+                <!-- 선택된 날짜 헤더 -->
+                <div class="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
+                    <div>
+                        <span id="selectedFullDate" class="text-xs text-slate-400 font-medium tracking-wide">2026. 06. 15 (월요일)</span>
+                        <h3 id="diaryCardTitle" class="text-lg font-bold text-slate-900 mt-0.5">일기 기록하기</h3>
+                    </div>
+                    <button id="btnDeleteDiary" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors hidden" title="일기 삭제">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- 일기 편집 모드 -->
+                <form id="diaryForm" class="space-y-4">
+                    <!-- 감정 선택 (Mood) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">오늘의 기분</label>
+                        <div class="grid grid-cols-5 gap-2" id="moodSelector">
+                            <button type="button" data-mood="happy" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all text-2xl group">
+                                <span>😊</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-indigo-600">행복</span>
+                            </button>
+                            <button type="button" data-mood="good" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all text-2xl group">
+                                <span>🙂</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-emerald-600">좋음</span>
+                            </button>
+                            <button type="button" data-mood="neutral" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all text-2xl group">
+                                <span>😐</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-amber-600">보통</span>
+                            </button>
+                            <button type="button" data-mood="sad" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all text-2xl group">
+                                <span>😢</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-blue-600">슬픔</span>
+                            </button>
+                            <button type="button" data-mood="tired" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all text-2xl group">
+                                <span>🥱</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-purple-600">피곤</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 제목 입력 -->
+                    <div>
+                        <label for="diaryTitle" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">제목</label>
+                        <input type="text" id="diaryTitle" placeholder="오늘 하루를 한 단어로 요약한다면?" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all" required>
+                    </div>
+
+                    <!-- 내용 입력 -->
+                    <div>
+                        <label for="diaryContent" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">내용</label>
+                        <textarea id="diaryContent" rows="6" placeholder="오늘 있었던 일들과 느꼈던 감정들을 자유롭게 적어보세요..." class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm resize-none transition-all" required></textarea>
+                    </div>
+
+                    <!-- 이미지 업로드 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">오늘의 사진</label>
+                        <div class="relative">
+                            <!-- 프리뷰 영역 -->
+                            <div id="imagePreviewContainer" class="hidden relative rounded-xl overflow-hidden aspect-video border border-slate-200 bg-slate-50 mb-2">
+                                <img id="imagePreview" src="" alt="Diary Attachment" class="w-full h-full object-cover">
+                                <button type="button" id="btnRemoveImage" class="absolute top-2 right-2 p-1.5 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-colors shadow-md">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <!-- 업로드 트리거 영역 -->
+                            <label id="uploadTrigger" class="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:bg-slate-50 hover:border-indigo-300 transition-all group">
+                                <i data-lucide="image" class="w-6 h-6 text-slate-400 group-hover:text-indigo-500 mb-1.5 transition-colors"></i>
+                                <span class="text-xs text-slate-500 group-hover:text-indigo-600 transition-colors">사진 첨부하기</span>
+                                <input type="file" id="imageInput" class="hidden" accept="image/*">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 저장 단추 -->
+                    <button type="submit" id="btnSaveDiary" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center space-x-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>일기 저장하기</span>
+                    </button>
+                </form>
+
+                <!-- 빈 상태 표시 (아직 날짜를 선택하지 않았을 때의 대체 UI) -->
+                <div id="emptyDiaryState" class="hidden flex-col items-center justify-center py-20 text-center">
+                    <div class="p-4 bg-slate-50 text-slate-400 rounded-2xl mb-4">
+                        <i data-lucide="calendar" class="w-10 h-10"></i>
+                    </div>
+                    <p class="font-bold text-slate-700">날짜를 선택해 주세요</p>
+                    <p class="text-xs text-slate-400 mt-1 max-w-[200px]">달력에서 원하는 날짜를 클릭하여 일기를 쓰거나 읽어 보세요.</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 모달: 커스텀 안내 팝업 -->
+    <div id="customAlert" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+        <div class="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 transform scale-95 transition-all duration-300">
+            <div class="flex items-center space-x-3 mb-4">
+                <div id="alertIconBg" class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                    <i id="alertIcon" data-lucide="info" class="w-5 h-5"></i>
+                </div>
+                <h4 id="alertTitle" class="text-base font-bold text-slate-900">알림</h4>
+            </div>
+            <p id="alertMessage" class="text-sm text-slate-600 mb-6 leading-relaxed">알림 메시지 본문입니다.</p>
+            <div class="flex space-x-2 justify-end">
+                <button id="btnAlertCancel" class="px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded-xl transition-colors hidden">취소</button>
+                <button id="btnAlertConfirm" class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-colors">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 푸터 -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-400">
+        <p>© 2026 하루기록. All rights reserved.</p>
+        <p class="mt-1">내 기기에만 안전하게 보관되는 로컬스토리지 기반 웹다이어리</p>
+    </footer>
+
+    <!-- 스크립트 작성 -->
+    <script>
+        // --- 1. 상태 및 상수 정의 ---
+        const MOODS = {
+            happy: { emoji: '😊', label: '행복', border: 'border-indigo-400', bg: 'bg-indigo-50/50' },
+            good: { emoji: '🙂', label: '좋음', border: 'border-emerald-400', bg: 'bg-emerald-50/50' },
+            neutral: { emoji: '😐', label: '보통', border: 'border-amber-400', bg: 'bg-amber-50/50' },
+            sad: { emoji: '😢', label: '슬픔', border: 'border-blue-400', bg: 'bg-blue-50/50' },
+            tired: { emoji: '🥱', label: '피곤', border: 'border-purple-400', bg: 'bg-purple-50/50' }
         };
 
-        const INITIAL_EVENTS = [
-            {
-                id: '1',
-                title: '프로젝트 런칭 회의 🚀',
-                date: new Date().toISOString().split('T')[0],
-                startTime: '10:00',
-                endTime: '11:30',
-                category: 'work',
-                location: '대회의실 A',
-                desc: '주요 마일스톤 점검 및 론칭 스케줄 확인'
-            },
-            {
-                id: '2',
-                title: '가족 저녁 식사 🍕',
-                date: new Date().toISOString().split('T')[0],
-                startTime: '18:35',
-                endTime: '20:30',
-                category: 'family',
-                location: '강남 파스타집',
-                desc: '부모님 생신 축하 기념 식사'
-            },
-            {
-                id: '3',
-                title: '리액트 컴포넌트 마스터하기 💻',
-                date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // 내일
-                startTime: '14:00',
-                endTime: '16:00',
-                category: 'learning',
-                location: '내 방 서재',
-                desc: '고급 최적화 훅 사용법 완벽 숙지하기'
-            },
-            {
-                id: '4',
-                title: '정기 치과 검진 🦷',
-                date: new Date(Date.now() - 86400000).toISOString().split('T')[0], // 어제
-                startTime: '11:00',
-                endTime: '12:00',
-                category: 'personal',
-                location: '튼튼치과의원',
-                desc: '스케일링 예약일'
+        let diaries = {}; // 전체 일기 데이터 { "YYYY-MM-DD": { title, content, mood, image, date } }
+        let currentDate = new Date(); // 달력 표시용 기준 날짜
+        let selectedDateStr = ""; // 현재 에디터에 선택된 날짜 문자열 ("YYYY-MM-DD")
+        let selectedMood = ""; // 현재 선택된 기분 코드
+        let attachedImageBase64 = ""; // 현재 첨부된 이미지 데이터
+
+        // --- 2. DOM 요소 취득 ---
+        const calendarTitle = document.getElementById('calendarTitle');
+        const calendarDays = document.getElementById('calendarDays');
+        const btnPrevMonth = document.getElementById('btnPrevMonth');
+        const btnNextMonth = document.getElementById('btnNextMonth');
+        const btnToday = document.getElementById('btnToday');
+
+        const diaryCard = document.getElementById('diaryCard');
+        const diaryForm = document.getElementById('diaryForm');
+        const emptyDiaryState = document.getElementById('emptyDiaryState');
+        const selectedFullDate = document.getElementById('selectedFullDate');
+        const diaryCardTitle = document.getElementById('diaryCardTitle');
+        const btnDeleteDiary = document.getElementById('btnDeleteDiary');
+        
+        const moodSelector = document.getElementById('moodSelector');
+        const diaryTitleInput = document.getElementById('diaryTitle');
+        const diaryContentInput = document.getElementById('diaryContent');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const btnRemoveImage = document.getElementById('btnRemoveImage');
+        const uploadTrigger = document.getElementById('uploadTrigger');
+        const btnSaveDiary = document.getElementById('btnSaveDiary');
+
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+        const searchCount = document.getElementById('searchCount');
+        const searchPlaceholder = document.getElementById('searchPlaceholder');
+
+        const btnBackup = document.getElementById('btnBackup');
+        const btnRestore = document.getElementById('btnRestore');
+        const fileInput = document.getElementById('fileInput');
+
+        const customAlert = document.getElementById('customAlert');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertIcon = document.getElementById('alertIcon');
+        const alertIconBg = document.getElementById('alertIconBg');
+        const btnAlertConfirm = document.getElementById('btnAlertConfirm');
+        const btnAlertCancel = document.getElementById('btnAlertCancel');
+
+        // --- 3. 커스텀 모달 알림창 구현 ---
+        let alertCallback = null;
+        let alertCancelCallback = null;
+
+        function showAlert(message, title = '알림', type = 'info', showCancel = false, onConfirm = null, onCancel = null) {
+            alertTitle.innerText = title;
+            alertMessage.innerText = message;
+            alertCallback = onConfirm;
+            alertCancelCallback = onCancel;
+
+            // 타입별 스타일셋 적용
+            if (type === 'danger') {
+                alertIconBg.className = "p-2 rounded-xl bg-red-50 text-red-600";
+                alertIcon.setAttribute('data-lucide', 'alert-triangle');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md transition-colors";
+            } else if (type === 'success') {
+                alertIconBg.className = "p-2 rounded-xl bg-emerald-50 text-emerald-600";
+                alertIcon.setAttribute('data-lucide', 'check-circle');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-colors";
+            } else {
+                alertIconBg.className = "p-2 rounded-xl bg-indigo-50 text-indigo-600";
+                alertIcon.setAttribute('data-lucide', 'info');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-colors";
             }
-        ];
 
-        // 요일 상수 정의 (일요일 시작)
-        const DAYS_OF_WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+            if (showCancel) {
+                btnAlertCancel.classList.remove('hidden');
+            } else {
+                btnAlertCancel.classList.add('hidden');
+            }
 
-        function App() {
-            // 상태값 관리
-            const [currentDate, setCurrentDate] = useState(new Date());
-            const [events, setEvents] = useState(() => {
-                const saved = localStorage.getItem('smart_calendar_events');
-                return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-            });
-            const [selectedDate, setSelectedDate] = useState(new Date());
-            const [viewMode, setViewMode] = useState('month'); // 'month' | 'week' | 'day'
-            const [searchQuery, setSearchQuery] = useState('');
-            const [selectedCategories, setSelectedCategories] = useState(Object.keys(CATEGORIES));
-            const [isDarkMode, setIsDarkMode] = useState(() => {
-                const savedMode = localStorage.getItem('theme');
-                return savedMode ? savedMode === 'dark' : false;
-            });
-            const [toastMessage, setToastMessage] = useState('');
-            const [sidebarOpen, setSidebarOpen] = useState(false);
+            lucide.createIcons();
 
-            // 모달 상태
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [editingEvent, setEditingEvent] = useState(null);
-            
-            // 모달 입력 필드
-            const [eventTitle, setEventTitle] = useState('');
-            const [eventDate, setEventDate] = useState('');
-            const [eventStartTime, setEventStartTime] = useState('09:00');
-            const [eventEndTime, setEventEndTime] = useState('10:00');
-            const [eventCategory, setEventCategory] = useState('work');
-            const [eventLocation, setEventLocation] = useState('');
-            const [eventDesc, setEventDesc] = useState('');
+            customAlert.classList.remove('opacity-0', 'pointer-events-none');
+            customAlert.querySelector('div').classList.remove('scale-95');
+            customAlert.querySelector('div').classList.add('scale-100');
+        }
 
-            // 다크모드 적용 효과
-            useEffect(() => {
-                const root = window.document.documentElement;
-                if (isDarkMode) {
-                    root.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    root.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
-            }, [isDarkMode]);
+        function closeAlert() {
+            customAlert.classList.add('opacity-0', 'pointer-events-none');
+            customAlert.querySelector('div').classList.remove('scale-100');
+            customAlert.querySelector('div').classList.add('scale-95');
+        }
 
-            // 로컬스토리지에 일정 저장 효과
-            useEffect(() => {
-                localStorage.setItem('smart_calendar_events', JSON.stringify(events));
-            }, [events]);
+        btnAlertConfirm.addEventListener('click', () => {
+            closeAlert();
+            if (alertCallback) alertCallback();
+        });
 
-            // 메시지 알림(토스트) 트리거 함수
-            const showToast = (msg) => {
-                setToastMessage(msg);
-                setTimeout(() => {
-                    setToastMessage('');
-                }, 3000);
-            };
+        btnAlertCancel.addEventListener('click', () => {
+            closeAlert();
+            if (alertCancelCallback) alertCancelCallback();
+        });
 
-            // 특정 월의 정보 계산 함수들
+
+        // --- 4. 로컬스토리지 핸들링 기능 ---
+        function loadDiaries() {
+            try {
+                const stored = localStorage.getItem('haru_diaries');
+                diaries = stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                console.error("데이터 로드 에러:", e);
+                showAlert("저장된 데이터를 읽어오는 중 문제가 발생했습니다.", "오류", "danger");
+                diaries = {};
+            }
+        }
+
+        function saveDiariesToStorage() {
+            try {
+                localStorage.setItem('haru_diaries', JSON.stringify(diaries));
+                renderCalendar();
+                updateSearch();
+            } catch (e) {
+                console.error("데이터 저장 에러:", e);
+                showAlert("용량 초과 등의 이유로 데이터를 저장하지 못했습니다.", "저장 실패", "danger");
+            }
+        }
+
+
+        // --- 5. 날짜 포맷팅 유틸리티 ---
+        function formatDateString(year, month, date) {
+            const mm = String(month + 1).padStart(2, '0');
+            const dd = String(date).padStart(2, '0');
+            return `${year}-${mm}-${dd}`;
+        }
+
+        function getKoreanDayName(year, month, date) {
+            const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const dayIdx = new Date(year, month, date).getDay();
+            return days[dayIdx];
+        }
+
+
+        // --- 6. 달력 그리기 ---
+        function renderCalendar() {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
 
-            const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-            const getFirstDayOfMonth = (y, m) => new Date(y, m, 1).getDay();
+            calendarTitle.innerText = `${year}년 ${month + 1}월`;
 
-            // 이전/다음 월/일/주 이동 함수
-            const navigateDate = (direction) => {
-                const nextDate = new Date(currentDate);
-                if (viewMode === 'month') {
-                    nextDate.setMonth(currentDate.getMonth() + direction);
-                } else if (viewMode === 'week') {
-                    nextDate.setDate(currentDate.getDate() + (direction * 7));
-                } else {
-                    nextDate.setDate(currentDate.getDate() + direction);
-                }
-                setCurrentDate(nextDate);
-                setSelectedDate(nextDate);
-            };
+            // 이번 달 시작일 요일 및 전체 일수 구하기
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            
+            // 이전 달의 마지막 일수
+            const prevLastDate = new Date(year, month, 0).getDate();
 
-            const goToToday = () => {
-                const today = new Date();
-                setCurrentDate(today);
-                setSelectedDate(today);
-            };
+            let daysHTML = "";
 
-            // 검색어 및 필터링된 일정 목록 추출
-            const filteredEvents = useMemo(() => {
-                return events.filter(event => {
-                    const matchCategory = selectedCategories.includes(event.category);
-                    const matchSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                        event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                        event.desc.toLowerCase().includes(searchQuery.toLowerCase());
-                    return matchCategory && matchSearch;
-                }).sort((a, b) => {
-                    // 날짜 순 정렬, 날짜 같으면 시간 순
-                    if (a.date !== b.date) return new Date(a.date) - new Date(b.date);
-                    return a.startTime.localeCompare(b.startTime);
-                });
-            }, [events, searchQuery, selectedCategories]);
-
-            // 특정 날짜에 해당하는 일정 필터링
-            const getEventsForDate = (dateStr) => {
-                return filteredEvents.filter(event => event.date === dateStr);
-            };
-
-            // 일정 생성/수정 모달 열기
-            const openAddModal = (dateObj, existingEvent = null) => {
-                if (existingEvent) {
-                    setEditingEvent(existingEvent);
-                    setEventTitle(existingEvent.title);
-                    setEventDate(existingEvent.date);
-                    setEventStartTime(existingEvent.startTime);
-                    setEventEndTime(existingEvent.endTime);
-                    setEventCategory(existingEvent.category);
-                    setEventLocation(existingEvent.location || '');
-                    setEventDesc(existingEvent.desc || '');
-                } else {
-                    setEditingEvent(null);
-                    setEventTitle('');
-                    const formattedDate = dateObj ? dateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-                    setEventDate(formattedDate);
-                    setEventStartTime('09:00');
-                    setEventEndTime('10:00');
-                    setEventCategory('work');
-                    setEventLocation('');
-                    setEventDesc('');
-                }
-                setIsModalOpen(true);
-            };
-
-            // 일정 저장 처리
-            const handleSaveEvent = (e) => {
-                e.preventDefault();
-                if (!eventTitle.trim()) {
-                    showToast('⚠️ 일정 제목을 입력해 주세요.');
-                    return;
-                }
-                if (eventStartTime > eventEndTime) {
-                    showToast('⚠️ 시작 시간은 종료 시간보다 빠를 수 없습니다.');
-                    return;
-                }
-
-                if (editingEvent) {
-                    // 수정 모드
-                    setEvents(prev => prev.map(ev => 
-                        ev.id === editingEvent.id 
-                            ? { ...ev, title: eventTitle, date: eventDate, startTime: eventStartTime, endTime: eventEndTime, category: eventCategory, location: eventLocation, desc: eventDesc }
-                            : ev
-                    ));
-                    showToast('📝 일정이 수정되었습니다.');
-                } else {
-                    // 추가 모드
-                    const newEvent = {
-                        id: Date.now().toString(),
-                        title: eventTitle,
-                        date: eventDate,
-                        startTime: eventStartTime,
-                        endTime: eventEndTime,
-                        category: eventCategory,
-                        location: eventLocation,
-                        desc: eventDesc
-                    };
-                    setEvents(prev => [...prev, newEvent]);
-                    showToast('📅 일정이 추가되었습니다.');
-                }
-                setIsModalOpen(false);
-            };
-
-            // 일정 삭제 처리
-            const handleDeleteEvent = (eventId) => {
-                setEvents(prev => prev.filter(ev => ev.id !== eventId));
-                showToast('🗑️ 일정이 삭제되었습니다.');
-                setIsModalOpen(false);
-            };
-
-            // 카테고리 필터 토글
-            const toggleCategoryFilter = (catId) => {
-                setSelectedCategories(prev => 
-                    prev.includes(catId) 
-                        ? prev.filter(id => id !== catId)
-                        : [...prev, catId]
-                );
-            };
-
-            // 캘린더 그리드 생성용 도우미 데이터
-            const calendarCells = useMemo(() => {
-                const totalDays = getDaysInMonth(year, month);
-                const firstDayIndex = getFirstDayOfMonth(year, month);
-                const prevMonthDays = getDaysInMonth(year, month - 1);
-                const cells = [];
-
-                // 1. 이전 달 날짜 채우기
-                for (let i = firstDayIndex - 1; i >= 0; i--) {
-                    const prevDate = new Date(year, month - 1, prevMonthDays - i);
-                    cells.push({
-                        date: prevDate,
-                        isCurrentMonth: false,
-                        isToday: false,
-                        dayNum: prevMonthDays - i
-                    });
-                }
-
-                // 2. 이번 달 날짜 채우기
-                const todayStr = new Date().toISOString().split('T')[0];
-                for (let d = 1; d <= totalDays; d++) {
-                    const thisDate = new Date(year, month, d);
-                    const thisDateStr = thisDate.toISOString().split('T')[0];
-                    cells.push({
-                        date: thisDate,
-                        isCurrentMonth: true,
-                        isToday: thisDateStr === todayStr,
-                        dayNum: d
-                    });
-                }
-
-                // 3. 다음 달 날짜 채우기
-                const totalCellsUsed = cells.length;
-                const remainingCells = 42 - totalCellsUsed; // 6행 7열 기준 채우기
-                for (let d = 1; d <= remainingCells; d++) {
-                    const nextDate = new Date(year, month + 1, d);
-                    cells.push({
-                        date: nextDate,
-                        isCurrentMonth: false,
-                        isToday: false,
-                        dayNum: d
-                    });
-                }
-
-                return cells;
-            }, [year, month]);
-
-            // 주간 보기 일자 산출 (선택한 날짜 기준 앞뒤 요일 매칭)
-            const weekDays = useMemo(() => {
-                const base = new Date(currentDate);
-                const dayIndex = base.getDay(); // 0 (일) - 6 (토)
-                const startOfWeek = new Date(base);
-                startOfWeek.setDate(base.getDate() - dayIndex);
-
-                const weekArr = [];
-                for (let i = 0; i < 7; i++) {
-                    const d = new Date(startOfWeek);
-                    d.setDate(startOfWeek.getDate() + i);
-                    weekArr.push(d);
-                }
-                return weekArr;
-            }, [currentDate]);
-
-            // 다가올 미래의 주요 일정 5개
-            const upcomingEvents = useMemo(() => {
-                const todayStr = new Date().toISOString().split('T')[0];
-                return events
-                    .filter(ev => ev.date >= todayStr)
-                    .sort((a, b) => new Date(a.date) - new Date(b.date))
-                    .slice(0, 5);
-            }, [events]);
-
-            return (
-                <div className="min-h-screen flex flex-col antialiased">
-                    
-                    {/* 알림 토스트 */}
-                    {toastMessage && (
-                        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 animate-bounce border border-slate-700/30">
-                            <span className="text-sm font-medium">{toastMessage}</span>
-                        </div>
-                    )}
-
-                    {/* 상단 통합 헤더 영역 */}
-                    <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            {/* 모바일 사이드바 토글 버튼 */}
-                            <button 
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                className="md:hidden p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                            {/* 브랜드 로고 */}
-                            <div className="flex items-center space-x-2">
-                                <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/20">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <span className="font-bold text-lg tracking-tight hidden sm:block bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
-                                    스마트 플래너
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* 글로벌 검색창 */}
-                        <div className="flex-1 max-w-md mx-4 hidden md:block">
-                            <div className="relative">
-                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="일정 검색 (제목, 위치, 설명 등)..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:focus:ring-brand-500/50 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
-                                />
-                            </div>
-                        </div>
-
-                        {/* 라이트/다크 및 액션 버튼들 */}
-                        <div className="flex items-center space-x-3">
-                            <button
-                                onClick={() => setIsDarkMode(!isDarkMode)}
-                                className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                title={isDarkMode ? "라이트 모드" : "다크 모드"}
-                            >
-                                {isDarkMode ? (
-                                    <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 100 2h1z" clipRule="evenodd" />
-                                    </svg>
-                                ) : (
-                                    <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                    </svg>
-                                )}
-                            </button>
-
-                            <button
-                                onClick={() => openAddModal(selectedDate)}
-                                className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white rounded-xl shadow-md hover:shadow-brand-500/20 active:scale-95 transition-all text-sm font-semibold"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>새 일정</span>
-                            </button>
-                        </div>
-                    </header>
-
-                    {/* 메인 레이아웃 본문 */}
-                    <div className="flex-1 flex overflow-hidden">
-                        
-                        {/* 사이드바 영역 */}
-                        <aside className={`
-                            fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-5 transform transition-transform duration-300 md:translate-x-0 md:static md:z-auto shrink-0 flex flex-col justify-between
-                            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                        `}>
-                            <div>
-                                <div className="flex items-center justify-between mb-6 md:hidden">
-                                    <span className="font-bold text-lg text-brand-600 dark:text-indigo-400">메뉴</span>
-                                    <button 
-                                        onClick={() => setSidebarOpen(false)}
-                                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
-                                    >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                {/* 모바일 검색창 대용 */}
-                                <div className="mb-6 md:hidden">
-                                    <div className="relative">
-                                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                            </svg>
-                                        </span>
-                                        <input
-                                            type="text"
-                                            placeholder="일정 검색..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 미니 달력 표시 */}
-                                <div className="mb-6">
-                                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">빠른 선택</h3>
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="font-bold text-sm text-slate-700 dark:text-slate-300">
-                                                {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
-                                            </span>
-                                            <div className="flex space-x-1">
-                                                <button onClick={() => navigateDate(-1)} className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                                                </button>
-                                                <button onClick={() => navigateDate(1)} className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-slate-400 mb-1">
-                                            {DAYS_OF_WEEK.map(d => <span key={d}>{d}</span>)}
-                                        </div>
-                                        <div className="grid grid-cols-7 gap-1">
-                                            {calendarCells.map((cell, idx) => {
-                                                const isSelected = selectedDate.toDateString() === cell.date.toDateString();
-                                                const hasEvent = events.some(ev => ev.date === cell.date.toISOString().split('T')[0]);
-                                                return (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => {
-                                                            setSelectedDate(cell.date);
-                                                            setCurrentDate(cell.date);
-                                                        }}
-                                                        className={`
-                                                            h-6 w-6 mx-auto rounded-full flex flex-col items-center justify-center text-xs relative transition-all
-                                                            ${cell.isCurrentMonth ? 'text-slate-700 dark:text-slate-300' : 'text-slate-300 dark:text-slate-600'}
-                                                            ${cell.isToday && !isSelected ? 'bg-indigo-100 dark:bg-indigo-950/50 text-brand-600 font-bold' : ''}
-                                                            ${isSelected ? 'bg-brand-600 text-white font-bold' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}
-                                                        `}
-                                                    >
-                                                        <span>{cell.dayNum}</span>
-                                                        {hasEvent && !isSelected && (
-                                                            <span className="absolute bottom-[2px] w-1 h-1 bg-brand-500 dark:bg-brand-400 rounded-full"></span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 카테고리 필터 체크박스 */}
-                                <div className="mb-6">
-                                    <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">카테고리 필터</h3>
-                                    <div className="space-y-2">
-                                        {Object.values(CATEGORIES).map(cat => {
-                                            const isActive = selectedCategories.includes(cat.id);
-                                            return (
-                                                <button
-                                                    key={cat.id}
-                                                    onClick={() => toggleCategoryFilter(cat.id)}
-                                                    className={`
-                                                        w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all border
-                                                        ${isActive 
-                                                            ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm' 
-                                                            : 'bg-transparent border-transparent opacity-60 hover:opacity-100'}
-                                                    `}
-                                                >
-                                                    <div className="flex items-center space-x-2.5">
-                                                        <span className={`w-3.5 h-3.5 rounded-full ${cat.dot}`}></span>
-                                                        <span className="font-medium text-slate-700 dark:text-slate-300">{cat.label}</span>
-                                                    </div>
-                                                    <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${isActive ? 'bg-brand-500 text-white' : 'border border-slate-300 dark:border-slate-600'}`}>
-                                                        {isActive && (
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 다가오는 일정 요약 */}
-                            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-4 hidden lg:block">
-                                <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">다가오는 주요 일정</h3>
-                                <div className="space-y-2 max-h-[180px] overflow-y-auto">
-                                    {upcomingEvents.length === 0 ? (
-                                        <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">등록된 일정이 없습니다.</p>
-                                    ) : (
-                                        upcomingEvents.map(ev => {
-                                            const cat = CATEGORIES[ev.category];
-                                            return (
-                                                <div 
-                                                    key={ev.id} 
-                                                    onClick={() => openAddModal(null, ev)}
-                                                    className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 text-left transition-all cursor-pointer border-l-4 border-l-indigo-500"
-                                                    style={{ borderLeftColor: ev.category === 'work' ? '#3b82f6' : ev.category === 'personal' ? '#10b981' : ev.category === 'family' ? '#ec4899' : ev.category === 'learning' ? '#a855f7' : '#f59e0b' }}
-                                                >
-                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{ev.title}</p>
-                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500">{ev.date} • {ev.startTime}</p>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            </div>
-                        </aside>
-
-                        {/* 모바일 사이드바 배경 블러 */}
-                        {sidebarOpen && (
-                            <div 
-                                onClick={() => setSidebarOpen(false)}
-                                className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm md:hidden"
-                            />
-                        )}
-
-                        {/* 메인 캘린더 대시보드 */}
-                        <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-6 transition-all duration-300">
-                            
-                            {/* 상단 캘린더 네비게이터 */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                                <div className="flex items-center space-x-1.5">
-                                    <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">
-                                        {viewMode === 'month' && `${year}년 ${month + 1}월`}
-                                        {viewMode === 'week' && `${weekDays[0].getFullYear()}년 ${weekDays[0].getMonth() + 1}월`}
-                                        {viewMode === 'day' && `${selectedDate.getFullYear()}년 ${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`}
-                                    </h2>
-                                    <span className="text-xs text-brand-600 dark:text-indigo-400 font-bold bg-brand-50 dark:bg-indigo-950/60 border border-brand-100 dark:border-indigo-900 px-2 py-0.5 rounded-full">
-                                        {viewMode === 'month' && "Month"}
-                                        {viewMode === 'week' && "Week"}
-                                        {viewMode === 'day' && "Day"}
-                                    </span>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {/* 날짜 이동 내비 */}
-                                    <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-sm">
-                                        <button 
-                                            onClick={() => navigateDate(-1)} 
-                                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                                            </svg>
-                                        </button>
-                                        <button 
-                                            onClick={goToToday}
-                                            className="px-3 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300"
-                                        >
-                                            오늘
-                                        </button>
-                                        <button 
-                                            onClick={() => navigateDate(1)} 
-                                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        </button>
-                                    </div>
-
-                                    {/* 뷰 변환 세그먼트 컨트롤 */}
-                                    <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-sm">
-                                        {[
-                                            { id: 'month', label: '월' },
-                                            { id: 'week', label: '주' },
-                                            { id: 'day', label: '일' }
-                                        ].map(tab => (
-                                            <button
-                                                key={tab.id}
-                                                onClick={() => setViewMode(tab.id)}
-                                                className={`
-                                                    px-3.5 py-1 rounded-lg text-sm font-semibold transition-all
-                                                    ${viewMode === tab.id 
-                                                        ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/10' 
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}
-                                                `}
-                                            >
-                                                {tab.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 월간 뷰 그리드 */}
-                            {viewMode === 'month' && (
-                                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
-                                    {/* 요일 머리글 */}
-                                    <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                        {DAYS_OF_WEEK.map((day, idx) => (
-                                            <div 
-                                                key={day} 
-                                                className={`py-3 text-center text-xs font-bold uppercase tracking-wider
-                                                    ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500'}
-                                                `}
-                                            >
-                                                {day}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* 날짜 본문 그리드 */}
-                                    <div className="grid grid-cols-7 flex-1">
-                                        {calendarCells.map((cell, idx) => {
-                                            const cellDateStr = cell.date.toISOString().split('T')[0];
-                                            const dayEvents = getEventsForDate(cellDateStr);
-                                            const isSelected = selectedDate.toDateString() === cell.date.toDateString();
-
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    onClick={() => {
-                                                        setSelectedDate(cell.date);
-                                                        // 더블클릭이나 빈 공간 터치시 즉시 등록 활성화
-                                                    }}
-                                                    className={`
-                                                        min-h-[85px] p-1.5 md:p-2.5 border-b border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all group cursor-pointer relative
-                                                        ${idx % 7 === 6 ? 'border-r-0' : ''}
-                                                        ${idx >= 35 ? 'border-b-0' : ''}
-                                                        ${cell.isCurrentMonth ? 'bg-transparent' : 'bg-slate-50/50 dark:bg-slate-900/30'}
-                                                        ${isSelected ? 'ring-2 ring-brand-500 ring-inset dark:ring-brand-500/70' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'}
-                                                    `}
-                                                >
-                                                    {/* 상단 날짜 및 플러스 아이콘 */}
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className={`
-                                                            text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full
-                                                            ${cell.isToday ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20' : ''}
-                                                            ${!cell.isCurrentMonth ? 'text-slate-300 dark:text-slate-600' : ''}
-                                                            ${cell.isCurrentMonth && !cell.isToday ? 'text-slate-700 dark:text-slate-300' : ''}
-                                                            ${cell.date.getDay() === 0 && cell.isCurrentMonth && !cell.isToday ? 'text-rose-500' : ''}
-                                                            ${cell.date.getDay() === 6 && cell.isCurrentMonth && !cell.isToday ? 'text-blue-500' : ''}
-                                                        `}>
-                                                            {cell.dayNum}
-                                                        </span>
-                                                        
-                                                        {/* 호버 시 플러스 버튼 활성화 */}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openAddModal(cell.date);
-                                                            }}
-                                                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-opacity"
-                                                            title="일정 추가"
-                                                        >
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-
-                                                    {/* 날짜 내부 일정 목록 */}
-                                                    <div className="flex-1 space-y-1 overflow-y-auto max-h-[85px]">
-                                                        {dayEvents.map(event => {
-                                                            const cat = CATEGORIES[event.category];
-                                                            return (
-                                                                <div
-                                                                    key={event.id}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        openAddModal(null, event);
-                                                                    }}
-                                                                    className={`
-                                                                        px-1.5 py-0.5 text-[10px] md:text-xs font-medium rounded-md truncate transition-all border border-transparent shadow-sm hover:scale-[1.02] active:scale-[0.98]
-                                                                        ${cat.color}
-                                                                    `}
-                                                                    title={`${event.startTime} - ${event.title}`}
-                                                                >
-                                                                    <span className="font-bold mr-1 opacity-90">{event.startTime}</span>
-                                                                    {event.title}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-
-                                                    {/* 모바일 화면용 이벤트 축소 도트 표시 */}
-                                                    {dayEvents.length > 0 && (
-                                                        <div className="flex md:hidden justify-center space-x-0.5 mt-auto">
-                                                            {dayEvents.map(ev => (
-                                                                <span key={ev.id} className={`w-1 h-1 rounded-full ${CATEGORIES[ev.category].dot}`}></span>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 주간 뷰 그리드 */}
-                            {viewMode === 'week' && (
-                                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 flex flex-col">
-                                    <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                        {weekDays.map((day, idx) => {
-                                            const todayStr = new Date().toISOString().split('T')[0];
-                                            const isToday = day.toISOString().split('T')[0] === todayStr;
-                                            return (
-                                                <div key={idx} className="py-4 text-center flex flex-col items-center">
-                                                    <span className="text-[10px] uppercase font-bold text-slate-400 mb-1">{DAYS_OF_WEEK[idx]}</span>
-                                                    <span className={`
-                                                        w-8 h-8 flex items-center justify-center text-sm font-bold rounded-full
-                                                        ${isToday ? 'bg-brand-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300'}
-                                                    `}>
-                                                        {day.getDate()}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* 주간 일정 출력 */}
-                                    <div className="grid grid-cols-7 flex-1 min-h-[400px]">
-                                        {weekDays.map((day, idx) => {
-                                            const dayStr = day.toISOString().split('T')[0];
-                                            const dayEvents = getEventsForDate(dayStr);
-                                            return (
-                                                <div 
-                                                    key={idx} 
-                                                    onClick={() => openAddModal(day)}
-                                                    className="p-2 border-r border-slate-200 dark:border-slate-800 last:border-r-0 min-h-full hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all flex flex-col space-y-2 cursor-pointer"
-                                                >
-                                                    {dayEvents.map(event => {
-                                                        const cat = CATEGORIES[event.category];
-                                                        return (
-                                                            <div
-                                                                key={event.id}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    openAddModal(null, event);
-                                                                }}
-                                                                className={`p-2 rounded-xl border border-transparent hover:shadow-md transition-all text-left ${cat.color}`}
-                                                            >
-                                                                <span className="text-[10px] font-bold block opacity-75">{event.startTime} - {event.endTime}</span>
-                                                                <span className="text-xs font-bold block truncate">{event.title}</span>
-                                                                {event.location && (
-                                                                    <span className="text-[9px] mt-1 block truncate opacity-90 flex items-center">
-                                                                        📍 {event.location}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {dayEvents.length === 0 && (
-                                                        <div className="h-full flex items-center justify-center text-slate-300 dark:text-slate-700 text-xs italic pointer-events-none">
-                                                            비어있음
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 일간 뷰 그리드 */}
-                            {viewMode === 'day' && (
-                                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 flex flex-col md:flex-row">
-                                    {/* 왼쪽 타임라인 헤더 */}
-                                    <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 p-5 flex flex-col items-center justify-center bg-slate-50/30 dark:bg-slate-900/50">
-                                        <p className="text-sm font-semibold text-brand-600 dark:text-indigo-400 mb-2">선택한 날짜</p>
-                                        <h3 className="text-5xl font-black text-slate-950 dark:text-slate-50 mb-3">{selectedDate.getDate()}</h3>
-                                        <p className="text-md font-bold text-slate-700 dark:text-slate-300 mb-1">{DAYS_OF_WEEK[selectedDate.getDay()]}요일</p>
-                                        <p className="text-xs text-slate-400 dark:text-slate-500">{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월</p>
-                                        
-                                        <button
-                                            onClick={() => openAddModal(selectedDate)}
-                                            className="mt-6 flex items-center space-x-1.5 px-4 py-2 bg-brand-100 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300 rounded-xl font-bold text-xs"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                                            <span>이날에 일정 추가</span>
-                                        </button>
-                                    </div>
-
-                                    {/* 오른쪽 시간별 슬롯 또는 일정 리스트 */}
-                                    <div className="flex-1 p-5 overflow-y-auto max-h-[500px]">
-                                        <h4 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider mb-4">일정 타임라인</h4>
-                                        <div className="space-y-3">
-                                            {getEventsForDate(selectedDate.toISOString().split('T')[0]).length === 0 ? (
-                                                <div className="text-center py-12">
-                                                    <span className="text-4xl">🍃</span>
-                                                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">이날 등록된 일정이 존재하지 않습니다.</p>
-                                                </div>
-                                            ) : (
-                                                getEventsForDate(selectedDate.toISOString().split('T')[0]).map(event => {
-                                                    const cat = CATEGORIES[event.category];
-                                                    return (
-                                                        <div
-                                                            key={event.id}
-                                                            onClick={() => openAddModal(null, event)}
-                                                            className={`p-4 rounded-xl border border-transparent shadow-sm hover:shadow-md transition-all cursor-pointer ${cat.bg} border-l-4`}
-                                                            style={{ borderLeftColor: event.category === 'work' ? '#3b82f6' : event.category === 'personal' ? '#10b981' : event.category === 'family' ? '#ec4899' : event.category === 'learning' ? '#a855f7' : '#f59e0b' }}
-                                                        >
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <h5 className="font-bold text-slate-900 dark:text-slate-100">{event.title}</h5>
-                                                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${cat.color}`}>{cat.label}</span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2 flex items-center">
-                                                                ⏰ {event.startTime} - {event.endTime}
-                                                                {event.location && <span className="mx-2">•</span>}
-                                                                {event.location && `📍 ${event.location}`}
-                                                            </p>
-                                                            {event.desc && <p className="text-xs text-slate-600 dark:text-slate-400 bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-lg">{event.desc}</p>}
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 모바일 하단 선택 날짜 일정 리스트 (월간 뷰에서 날짜 탭했을 때 하단 목록 지원용) */}
-                            {viewMode === 'month' && (
-                                <div className="mt-6 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
-                                            📋 {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 일정 목록
-                                        </h3>
-                                        <button 
-                                            onClick={() => openAddModal(selectedDate)}
-                                            className="text-xs font-bold text-brand-600 dark:text-indigo-400 hover:underline"
-                                        >
-                                            + 추가하기
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {getEventsForDate(selectedDate.toISOString().split('T')[0]).length === 0 ? (
-                                            <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">등록된 일정이 없습니다. 달력 날짜를 더블클릭하거나 추가 버튼을 누르세요.</p>
-                                        ) : (
-                                            getEventsForDate(selectedDate.toISOString().split('T')[0]).map(ev => {
-                                                const cat = CATEGORIES[ev.category];
-                                                return (
-                                                    <div 
-                                                        key={ev.id}
-                                                        onClick={() => openAddModal(null, ev)}
-                                                        className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer border-l-4"
-                                                        style={{ borderLeftColor: ev.category === 'work' ? '#3b82f6' : ev.category === 'personal' ? '#10b981' : ev.category === 'family' ? '#ec4899' : ev.category === 'learning' ? '#a855f7' : '#f59e0b' }}
-                                                    >
-                                                        <div>
-                                                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{ev.title}</p>
-                                                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                                                                {ev.startTime} - {ev.endTime} {ev.location && `| 📍 ${ev.location}`}
-                                                            </p>
-                                                        </div>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cat.color}`}>{cat.label}</span>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                        </main>
+            // 1. 이전 달 날짜 채우기 (빈 칸 채움)
+            for (let i = firstDayIndex; i > 0; i--) {
+                const day = prevLastDate - i + 1;
+                daysHTML += `
+                    <div class="h-14 p-1 text-slate-300 text-xs flex flex-col justify-between border border-transparent select-none cursor-not-allowed">
+                        <span>${day}</span>
                     </div>
+                `;
+            }
 
-                    {/* 일정 추가/수정 모달 */}
-                    {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                            {/* 백드롭 차단 */}
-                            <div 
-                                onClick={() => setIsModalOpen(false)}
-                                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
-                            />
-                            
-                            {/* 모달 창 본체 */}
-                            <div className="relative bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
-                                <header className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
-                                        {editingEvent ? '📝 일정 수정하기' : '📅 새 일정 추가'}
-                                    </h3>
-                                    <button 
-                                        onClick={() => setIsModalOpen(false)}
-                                        className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </header>
+            // 2. 이번 달 실제 날짜 채우기
+            const today = new Date();
+            for (let day = 1; day <= lastDate; day++) {
+                const dateStr = formatDateString(year, month, day);
+                const hasDiary = !!diaries[dateStr];
+                const diaryObj = diaries[dateStr];
+                
+                const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+                const isSelected = selectedDateStr === dateStr;
 
-                                <form onSubmit={handleSaveEvent} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
-                                    {/* 일정 제목 */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">일정명 *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={eventTitle}
-                                            onChange={(e) => setEventTitle(e.target.value)}
-                                            placeholder="예: 주간 회의, 마트 장보기 등"
-                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none dark:text-slate-100"
-                                        />
-                                    </div>
+                // 스타일 분기 처리
+                let borderStyle = isSelected ? 'border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/10' : 'border-slate-100 hover:border-slate-300';
+                let textStyle = "text-slate-700 font-medium";
+                
+                const dayOfWeek = new Date(year, month, day).getDay();
+                if (dayOfWeek === 0) textStyle = "text-rose-500 font-medium"; // 일요일
+                if (dayOfWeek === 6) textStyle = "text-blue-500 font-medium";  // 토요일
 
-                                    {/* 날짜 및 시간 영역 */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">날짜</label>
-                                            <input
-                                                type="date"
-                                                required
-                                                value={eventDate}
-                                                onChange={(e) => setEventDate(e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm dark:text-slate-100"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">시작 시간</label>
-                                            <input
-                                                type="time"
-                                                required
-                                                value={eventStartTime}
-                                                onChange={(e) => setEventStartTime(e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm dark:text-slate-100"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">종료 시간</label>
-                                            <input
-                                                type="time"
-                                                required
-                                                value={eventEndTime}
-                                                onChange={(e) => setEventEndTime(e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm dark:text-slate-100"
-                                            />
-                                        </div>
-                                    </div>
+                let todayBadge = "";
+                if (isToday) {
+                    todayBadge = `<span class="inline-flex w-5 h-5 items-center justify-center bg-indigo-600 text-white text-[10px] rounded-full font-bold">오늘</span>`;
+                    // 오늘인데 스타일이 일반적일 경우 숫자 교체용
+                }
 
-                                    {/* 카테고리 컬러 셀렉터 */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">카테고리</label>
-                                        <div className="grid grid-cols-5 gap-2">
-                                            {Object.values(CATEGORIES).map(cat => (
-                                                <button
-                                                    key={cat.id}
-                                                    type="button"
-                                                    onClick={() => setEventCategory(cat.id)}
-                                                    className={`
-                                                        py-2 rounded-xl text-xs font-bold text-center border transition-all
-                                                        ${eventCategory === cat.id 
-                                                            ? `${cat.color} border-slate-700 dark:border-slate-100 scale-105 shadow-md` 
-                                                            : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'}
-                                                    `}
-                                                >
-                                                    {cat.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* 장소 */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">장소 (선택)</label>
-                                        <input
-                                            type="text"
-                                            value={eventLocation}
-                                            onChange={(e) => setEventLocation(e.target.value)}
-                                            placeholder="예: 미팅룸 B, 화상 채팅 룸, 자택"
-                                            className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm dark:text-slate-100"
-                                        />
-                                    </div>
-
-                                    {/* 세부 메모 설명 */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">설명/메모 (선택)</label>
-                                        <textarea
-                                            value={eventDesc}
-                                            onChange={(e) => setEventDesc(e.target.value)}
-                                            placeholder="일정에 필요한 중요 참고 사항이나 준비물 등을 기재해 보세요."
-                                            rows="3"
-                                            className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm dark:text-slate-100 resize-none"
-                                        ></textarea>
-                                    </div>
-
-                                    {/* 하단 제어 영역 */}
-                                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-                                        {editingEvent ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteEvent(editingEvent.id)}
-                                                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-xl font-semibold text-sm transition-all"
-                                            >
-                                                삭제하기
-                                            </button>
-                                        ) : (
-                                            <div></div>
-                                        )}
-                                        <div className="flex items-center space-x-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsModalOpen(false)}
-                                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold text-sm transition-all"
-                                            >
-                                                취소
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm shadow-md shadow-brand-500/10 transition-all"
-                                            >
-                                                저장
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
+                // 감정이 있는 경우 달력 상의 표시 아이콘 설정
+                let moodIndicator = "";
+                if (hasDiary && diaryObj.mood && MOODS[diaryObj.mood]) {
+                    moodIndicator = `
+                        <div class="flex items-center justify-center mt-1">
+                            <span class="text-base" title="${MOODS[diaryObj.mood].label}">${MOODS[diaryObj.mood].emoji}</span>
                         </div>
-                    )}
-                </div>
-            );
+                    `;
+                } else if (hasDiary) {
+                    // 기분이 지정 안 된 일반 일기인 경우 작은 점 표시
+                    moodIndicator = `
+                        <div class="flex items-center justify-center mt-1">
+                            <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+                        </div>
+                    `;
+                }
+
+                daysHTML += `
+                    <div data-date="${dateStr}" class="h-16 p-1 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${borderStyle} ${isToday ? 'bg-indigo-50/20' : 'bg-white'}" onclick="selectDate('${dateStr}')">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs ${textStyle} ${isToday ? 'hidden' : ''}">${day}</span>
+                            ${isToday ? todayBadge : ''}
+                        </div>
+                        ${moodIndicator}
+                    </div>
+                `;
+            }
+
+            // 3. 다음 달 날짜 채우기 (끝부분 채움)
+            const totalCells = firstDayIndex + lastDate;
+            const nextDaysNeeded = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+            for (let i = 1; i <= nextDaysNeeded; i++) {
+                daysHTML += `
+                    <div class="h-14 p-1 text-slate-300 text-xs flex flex-col justify-between border border-transparent select-none cursor-not-allowed">
+                        <span>${i}</span>
+                    </div>
+                `;
+            }
+
+            calendarDays.innerHTML = daysHTML;
         }
 
-        // 마운트
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+
+        // --- 7. 특정 날짜 선택 및 일기 조회/작성 폼 갱신 ---
+        window.selectDate = function(dateStr) {
+            selectedDateStr = dateStr;
+            
+            // 기존 달력 리렌더링하여 선택 보더라인 표시 변경
+            renderCalendar();
+
+            // 날짜 파싱하여 라벨에 표기
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const formattedLabel = `${y}년 ${m}월 ${d}일 (${getKoreanDayName(y, m-1, d)})`;
+            selectedFullDate.innerText = formattedLabel;
+
+            const existingDiary = diaries[dateStr];
+
+            // 폼 리셋 및 초기 세팅
+            resetDiaryForm();
+
+            if (existingDiary) {
+                // 기존 일기가 있을 때 (조회 및 수정 모드)
+                diaryCardTitle.innerText = "일기 읽고 수정하기";
+                diaryTitleInput.value = existingDiary.title;
+                diaryContentInput.value = existingDiary.content;
+                
+                // 기분 선택 복원
+                if (existingDiary.mood) {
+                    selectMoodOption(existingDiary.mood);
+                }
+
+                // 이미지 로드 복원
+                if (existingDiary.image) {
+                    attachedImageBase64 = existingDiary.image;
+                    imagePreview.src = existingDiary.image;
+                    imagePreviewContainer.classList.remove('hidden');
+                    uploadTrigger.classList.add('hidden');
+                }
+
+                btnDeleteDiary.classList.remove('hidden');
+                btnSaveDiary.querySelector('span').innerText = "일기 수정하기";
+            } else {
+                // 일기가 없을 때 (새 일기 작성 모드)
+                diaryCardTitle.innerText = "오늘의 일기 쓰기";
+                btnDeleteDiary.classList.add('hidden');
+                btnSaveDiary.querySelector('span').innerText = "일기 저장하기";
+            }
+
+            // 스크롤 포커스를 에디터로 (모바일 환경 배려)
+            if (window.innerWidth < 1024) {
+                diaryCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+
+        function resetDiaryForm() {
+            diaryForm.reset();
+            selectedMood = "";
+            attachedImageBase64 = "";
+            
+            // Mood Selector 보더라인 및 효과 복원
+            const buttons = moodSelector.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.className = "flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 transition-all text-2xl group";
+                btn.querySelector('span:last-child').className = "text-[10px] text-slate-400 mt-1 font-medium";
+            });
+
+            // 이미지 업로드 부분 초기화
+            imagePreview.src = "";
+            imagePreviewContainer.classList.add('hidden');
+            uploadTrigger.classList.remove('hidden');
+            imageInput.value = "";
+        }
+
+        function selectMoodOption(moodKey) {
+            selectedMood = moodKey;
+            const buttons = moodSelector.querySelectorAll('button');
+            
+            buttons.forEach(btn => {
+                const btnMood = btn.getAttribute('data-mood');
+                if (btnMood === moodKey) {
+                    const moodTheme = MOODS[moodKey];
+                    btn.className = `flex flex-col items-center p-2 rounded-xl border-2 ${moodTheme.border} ${moodTheme.bg} transition-all scale-105 text-2xl shadow-sm`;
+                    btn.querySelector('span:last-child').className = "text-[10px] text-slate-900 font-bold mt-1";
+                } else {
+                    btn.className = "flex flex-col items-center p-2 rounded-xl border border-slate-100 opacity-50 hover:opacity-100 transition-all text-2xl group";
+                    btn.querySelector('span:last-child').className = "text-[10px] text-slate-400 mt-1 font-medium";
+                }
+            });
+        }
+
+        // Mood 버튼 클릭 이벤트 부착
+        moodSelector.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', () => {
+                const moodKey = button.getAttribute('data-mood');
+                selectMoodOption(moodKey);
+            });
+        });
+
+
+        // --- 8. 이미지 처리 (FileReader 로 로컬 이미지 Base64 인코딩) ---
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 파일 용량 제한 (약 1.5MB 미만 제한, 로컬스토리지 전체 한도 5MB 내외 대비)
+            if (file.size > 1.5 * 1024 * 1024) {
+                showAlert("저장 용량 관리를 위해 1.5MB 이하의 사진만 등록 가능합니다.", "이미지 용량 초과", "danger");
+                imageInput.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                attachedImageBase64 = evt.target.result;
+                imagePreview.src = attachedImageBase64;
+                imagePreviewContainer.classList.remove('hidden');
+                uploadTrigger.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        btnRemoveImage.addEventListener('click', function() {
+            attachedImageBase64 = "";
+            imagePreview.src = "";
+            imagePreviewContainer.classList.add('hidden');
+            uploadTrigger.classList.remove('hidden');
+            imageInput.value = "";
+        });
+
+
+        // --- 9. 일기 저장 기능 ---
+        diaryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!selectedDateStr) {
+                showAlert("달력에서 날짜를 먼저 선택해 주세요.", "안내", "info");
+                return;
+            }
+
+            const title = diaryTitleInput.value.trim();
+            const content = diaryContentInput.value.trim();
+
+            if (!title || !content) {
+                showAlert("제목과 일기 내용을 모두 입력해 주세요.", "입력 확인", "info");
+                return;
+            }
+
+            // 기분 유효성 보완 (미지정시 선택 안내 또는 임의 저장 가능)
+            if (!selectedMood) {
+                // 선택 안한 경우 디폴트로 보관 가능하지만 권장
+                selectedMood = "neutral";
+            }
+
+            // 데이터 객체 적재
+            diaries[selectedDateStr] = {
+                title: title,
+                content: content,
+                mood: selectedMood,
+                image: attachedImageBase64,
+                date: selectedDateStr,
+                updatedAt: new Date().toISOString()
+            };
+
+            saveDiariesToStorage();
+            showAlert("오늘의 소중한 일기를 안전하게 저장했습니다.", "기록 완료", "success");
+            
+            // UI 초기화 및 현 상태 유지
+            selectDate(selectedDateStr);
+        });
+
+
+        // --- 10. 일기 삭제 기능 ---
+        btnDeleteDiary.addEventListener('click', function() {
+            if (!selectedDateStr || !diaries[selectedDateStr]) return;
+
+            showAlert(
+                `${selectedDateStr}의 일기를 정말 삭제하시겠습니까? 삭제된 기록은 되돌릴 수 없습니다.`,
+                "일기 삭제",
+                "danger",
+                true,
+                () => {
+                    // 삭제 확인 시
+                    delete diaries[selectedDateStr];
+                    saveDiariesToStorage();
+                    resetDiaryForm();
+                    
+                    // 새 작성 상태로 전환
+                    diaryCardTitle.innerText = "오늘의 일기 쓰기";
+                    btnDeleteDiary.classList.add('hidden');
+                    btnSaveDiary.querySelector('span').innerText = "일기 저장하기";
+                    
+                    showAlert("일기가 성공적으로 삭제되었습니다.", "삭제 성공", "success");
+                }
+            );
+        });
+
+
+        // --- 11. 일기 검색 엔진 구현 ---
+        function updateSearch() {
+            const query = searchInput.value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('searchResults');
+
+            if (!query) {
+                searchResults.classList.add('hidden');
+                searchPlaceholder.classList.remove('hidden');
+                searchCount.classList.add('hidden');
+                return;
+            }
+
+            const filtered = Object.values(diaries).filter(item => {
+                const matchTitle = item.title.toLowerCase().includes(query);
+                const matchContent = item.content.toLowerCase().includes(query);
+                
+                // 감정 이름 매칭
+                const moodObj = MOODS[item.mood];
+                const matchMood = moodObj ? moodObj.label.includes(query) : false;
+
+                return matchTitle || matchContent || matchMood;
+            });
+
+            // 내림차순 정렬 (최신순)
+            filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (filtered.length > 0) {
+                searchCount.innerText = `${filtered.length}개의 일기`;
+                searchCount.classList.remove('hidden');
+                searchPlaceholder.classList.add('hidden');
+                searchResults.classList.remove('hidden');
+
+                let html = "";
+                filtered.forEach(item => {
+                    const moodDetail = MOODS[item.mood] || { emoji: '✏️', label: '' };
+                    html += `
+                        <div class="p-3 bg-slate-50 hover:bg-indigo-50/40 border border-slate-100 hover:border-indigo-100 rounded-xl cursor-pointer transition-all flex items-center justify-between" onclick="selectDate('${item.date}')">
+                            <div class="flex-grow min-w-0 pr-3">
+                                <span class="text-[10px] text-indigo-500 font-bold block mb-0.5">${item.date}</span>
+                                <h4 class="text-sm font-semibold text-slate-800 truncate">${item.title}</h4>
+                                <p class="text-xs text-slate-400 truncate mt-0.5">${item.content}</p>
+                            </div>
+                            <div class="flex flex-col items-center flex-shrink-0 bg-white p-2 rounded-lg border border-slate-100 shadow-sm min-w-[40px]">
+                                <span class="text-lg">${moodDetail.emoji}</span>
+                                <span class="text-[9px] text-slate-400 mt-0.5 font-medium">${moodDetail.label}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                resultsContainer.innerHTML = html;
+            } else {
+                searchCount.innerText = `0개의 결과`;
+                searchCount.classList.remove('hidden');
+                searchResults.classList.add('hidden');
+                searchPlaceholder.innerHTML = `<div class="text-center py-4 text-slate-400">"${query}"에 해당하는 일기가 없습니다.</div>`;
+                searchPlaceholder.classList.remove('hidden');
+            }
+        }
+
+        searchInput.addEventListener('input', updateSearch);
+
+
+        // --- 12. 백업 (내보내기) / 복원 (가져오기) ---
+        btnBackup.addEventListener('click', function() {
+            if (Object.keys(diaries).length === 0) {
+                showAlert("저장된 일기가 없어 백업 파일을 생성할 수 없습니다.", "백업 불가", "info");
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(diaries));
+            const downloadAnchor = document.createElement('a');
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `haru_diary_backup_${todayStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            
+            showAlert("백업 파일이 생성되었습니다. 컴퓨터에 안전하게 보관해 주세요.", "백업 성공", "success");
+        });
+
+        btnRestore.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    
+                    // 간단한 형식 검증
+                    if (typeof parsed !== 'object' || parsed === null) {
+                        throw new Error("유효하지 않은 구조입니다.");
+                    }
+
+                    showAlert(
+                        "새 데이터로 복원하면 현재 작성된 모든 일기가 덮어쓰기됩니다. 계속 진행하시겠습니까?",
+                        "데이터 복원 경고",
+                        "danger",
+                        true,
+                        () => {
+                            // 확인 시 복원
+                            diaries = parsed;
+                            saveDiariesToStorage();
+                            renderCalendar();
+                            updateSearch();
+                            resetDiaryForm();
+                            
+                            // 기본 오늘 날짜 재선택
+                            const todayStr = formatDateString(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+                            selectDate(todayStr);
+
+                            showAlert("모든 일기 데이터가 무사히 복원되었습니다.", "복원 성공", "success");
+                        }
+                    );
+
+                } catch (err) {
+                    showAlert("올바른 백업 JSON 파일이 아닙니다.", "가져오기 실패", "danger");
+                }
+            };
+            reader.readAsText(file);
+            fileInput.value = ""; // 파일 선택기 초기화
+        });
+
+
+        // --- 13. 달력 컨트롤 버튼 리스너 ---
+        btnPrevMonth.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        btnNextMonth.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        btnToday.addEventListener('click', () => {
+            currentDate = new Date();
+            renderCalendar();
+            const todayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+            selectDate(todayStr);
+        });
+
+
+        // --- 14. 초기 실행부 ---
+        window.onload = function() {
+            lucide.createIcons();
+            loadDiaries();
+            renderCalendar();
+            
+            // 오늘 날짜로 에디터 자동 시작
+            const today = new Date();
+            const todayStr = formatDateString(today.getFullYear(), today.getMonth(), today.getDate());
+            selectDate(todayStr);
+        };
     </script>
 </body>
 </html>
