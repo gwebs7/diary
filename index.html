@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하루기록 - 달력 일기장</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons (SVG 기반 아이콘 사용을 위함) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts (Noto Sans KR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- 상단 네비게이션 바 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">하루기록</h1>
+                    <p class="text-xs text-slate-500">달력으로 채워가는 나의 소중한 일상</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <!-- 백업/복원 버튼 -->
+                <button id="btnBackup" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200" title="데이터 백업">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                </button>
+                <button id="btnRestore" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200" title="데이터 복원">
+                    <i data-lucide="upload" class="w-5 h-5"></i>
+                </button>
+                <input type="file" id="fileInput" class="hidden" accept=".json">
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 왼쪽: 달력 및 검색 영역 (lg:col-span-7) -->
+        <section class="lg:col-span-7 space-y-6">
+            <!-- 달력 카드 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                <!-- 달력 헤더 -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center space-x-2">
+                        <h2 id="calendarTitle" class="text-xl font-bold text-slate-900">2026년 6월</h2>
+                        <button id="btnToday" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full font-medium transition-colors">
+                            오늘
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button id="btnPrevMonth" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                        </button>
+                        <button id="btnNextMonth" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 요일 표시 -->
+                <div class="grid grid-cols-7 gap-1 text-center font-medium text-xs text-slate-400 mb-2">
+                    <div class="text-red-500 py-2">일</div>
+                    <div class="py-2">월</div>
+                    <div class="py-2">화</div>
+                    <div class="py-2">수</div>
+                    <div class="py-2">목</div>
+                    <div class="py-2">금</div>
+                    <div class="text-blue-500 py-2">토</div>
+                </div>
+
+                <!-- 날짜 그리드 -->
+                <div id="calendarDays" class="grid grid-cols-7 gap-1">
+                    <!-- JS로 동적 생성 -->
+                </div>
+            </div>
+
+            <!-- 검색 및 통계 카드 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="search" class="w-4 h-4 text-indigo-500"></i>
+                        일기 검색하기
+                    </h3>
+                    <span id="searchCount" class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium hidden">
+                        0개의 일기
+                    </span>
+                </div>
+                <div class="relative mb-4">
+                    <input type="text" id="searchInput" placeholder="키워드나 감정을 검색해 보세요..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm transition-all">
+                    <i data-lucide="search" class="absolute left-3.5 top-3 w-4 h-4 text-slate-400"></i>
+                </div>
+                <!-- 검색 결과 리스트 -->
+                <div id="searchResults" class="space-y-2 max-h-48 overflow-y-auto hidden">
+                    <!-- JS 검색 결과 동적 추가 -->
+                </div>
+                <div id="searchPlaceholder" class="text-center py-6 text-slate-400 text-xs">
+                    작성된 일기 내용이나 제목을 입력해 보세요.
+                </div>
+            </div>
+        </section>
+
+        <!-- 오른쪽: 일기 에디터 및 뷰어 영역 (lg:col-span-5) -->
+        <section class="lg:col-span-5">
+            <!-- 일기 작성/편집 폼 카드 -->
+            <div id="diaryCard" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sticky top-24 transition-all duration-300">
+                
+                <!-- 선택된 날짜 헤더 -->
+                <div class="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
+                    <div>
+                        <span id="selectedFullDate" class="text-xs text-slate-400 font-medium tracking-wide">2026. 06. 15 (월요일)</span>
+                        <h3 id="diaryCardTitle" class="text-lg font-bold text-slate-900 mt-0.5">일기 기록하기</h3>
+                    </div>
+                    <button id="btnDeleteDiary" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors hidden" title="일기 삭제">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- 일기 편집 모드 -->
+                <form id="diaryForm" class="space-y-4">
+                    <!-- 감정 선택 (Mood) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">오늘의 기분</label>
+                        <div class="grid grid-cols-5 gap-2" id="moodSelector">
+                            <button type="button" data-mood="happy" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all text-2xl group">
+                                <span>😊</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-indigo-600">행복</span>
+                            </button>
+                            <button type="button" data-mood="good" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all text-2xl group">
+                                <span>🙂</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-emerald-600">좋음</span>
+                            </button>
+                            <button type="button" data-mood="neutral" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all text-2xl group">
+                                <span>😐</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-amber-600">보통</span>
+                            </button>
+                            <button type="button" data-mood="sad" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all text-2xl group">
+                                <span>😢</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-blue-600">슬픔</span>
+                            </button>
+                            <button type="button" data-mood="tired" class="flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all text-2xl group">
+                                <span>🥱</span>
+                                <span class="text-[10px] text-slate-400 mt-1 font-medium group-hover:text-purple-600">피곤</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 제목 입력 -->
+                    <div>
+                        <label for="diaryTitle" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">제목</label>
+                        <input type="text" id="diaryTitle" placeholder="오늘 하루를 한 단어로 요약한다면?" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all" required>
+                    </div>
+
+                    <!-- 내용 입력 -->
+                    <div>
+                        <label for="diaryContent" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">내용</label>
+                        <textarea id="diaryContent" rows="6" placeholder="오늘 있었던 일들과 느꼈던 감정들을 자유롭게 적어보세요..." class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm resize-none transition-all" required></textarea>
+                    </div>
+
+                    <!-- 이미지 업로드 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">오늘의 사진</label>
+                        <div class="relative">
+                            <!-- 프리뷰 영역 -->
+                            <div id="imagePreviewContainer" class="hidden relative rounded-xl overflow-hidden aspect-video border border-slate-200 bg-slate-50 mb-2">
+                                <img id="imagePreview" src="" alt="Diary Attachment" class="w-full h-full object-cover">
+                                <button type="button" id="btnRemoveImage" class="absolute top-2 right-2 p-1.5 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-colors shadow-md">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <!-- 업로드 트리거 영역 -->
+                            <label id="uploadTrigger" class="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:bg-slate-50 hover:border-indigo-300 transition-all group">
+                                <i data-lucide="image" class="w-6 h-6 text-slate-400 group-hover:text-indigo-500 mb-1.5 transition-colors"></i>
+                                <span class="text-xs text-slate-500 group-hover:text-indigo-600 transition-colors">사진 첨부하기</span>
+                                <input type="file" id="imageInput" class="hidden" accept="image/*">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 저장 단추 -->
+                    <button type="submit" id="btnSaveDiary" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center space-x-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>일기 저장하기</span>
+                    </button>
+                </form>
+
+                <!-- 빈 상태 표시 (아직 날짜를 선택하지 않았을 때의 대체 UI) -->
+                <div id="emptyDiaryState" class="hidden flex-col items-center justify-center py-20 text-center">
+                    <div class="p-4 bg-slate-50 text-slate-400 rounded-2xl mb-4">
+                        <i data-lucide="calendar" class="w-10 h-10"></i>
+                    </div>
+                    <p class="font-bold text-slate-700">날짜를 선택해 주세요</p>
+                    <p class="text-xs text-slate-400 mt-1 max-w-[200px]">달력에서 원하는 날짜를 클릭하여 일기를 쓰거나 읽어 보세요.</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 모달: 커스텀 안내 팝업 -->
+    <div id="customAlert" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+        <div class="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4 transform scale-95 transition-all duration-300">
+            <div class="flex items-center space-x-3 mb-4">
+                <div id="alertIconBg" class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                    <i id="alertIcon" data-lucide="info" class="w-5 h-5"></i>
+                </div>
+                <h4 id="alertTitle" class="text-base font-bold text-slate-900">알림</h4>
+            </div>
+            <p id="alertMessage" class="text-sm text-slate-600 mb-6 leading-relaxed">알림 메시지 본문입니다.</p>
+            <div class="flex space-x-2 justify-end">
+                <button id="btnAlertCancel" class="px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-100 rounded-xl transition-colors hidden">취소</button>
+                <button id="btnAlertConfirm" class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-colors">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 푸터 -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-400">
+        <p>© 2026 하루기록. All rights reserved.</p>
+        <p class="mt-1">내 기기에만 안전하게 보관되는 로컬스토리지 기반 웹다이어리</p>
+    </footer>
+
+    <!-- 스크립트 작성 -->
+    <script>
+        // --- 1. 상태 및 상수 정의 ---
+        const MOODS = {
+            happy: { emoji: '😊', label: '행복', border: 'border-indigo-400', bg: 'bg-indigo-50/50' },
+            good: { emoji: '🙂', label: '좋음', border: 'border-emerald-400', bg: 'bg-emerald-50/50' },
+            neutral: { emoji: '😐', label: '보통', border: 'border-amber-400', bg: 'bg-amber-50/50' },
+            sad: { emoji: '😢', label: '슬픔', border: 'border-blue-400', bg: 'bg-blue-50/50' },
+            tired: { emoji: '🥱', label: '피곤', border: 'border-purple-400', bg: 'bg-purple-50/50' }
+        };
+
+        let diaries = {}; // 전체 일기 데이터 { "YYYY-MM-DD": { title, content, mood, image, date } }
+        let currentDate = new Date(); // 달력 표시용 기준 날짜
+        let selectedDateStr = ""; // 현재 에디터에 선택된 날짜 문자열 ("YYYY-MM-DD")
+        let selectedMood = ""; // 현재 선택된 기분 코드
+        let attachedImageBase64 = ""; // 현재 첨부된 이미지 데이터
+
+        // --- 2. DOM 요소 취득 ---
+        const calendarTitle = document.getElementById('calendarTitle');
+        const calendarDays = document.getElementById('calendarDays');
+        const btnPrevMonth = document.getElementById('btnPrevMonth');
+        const btnNextMonth = document.getElementById('btnNextMonth');
+        const btnToday = document.getElementById('btnToday');
+
+        const diaryCard = document.getElementById('diaryCard');
+        const diaryForm = document.getElementById('diaryForm');
+        const emptyDiaryState = document.getElementById('emptyDiaryState');
+        const selectedFullDate = document.getElementById('selectedFullDate');
+        const diaryCardTitle = document.getElementById('diaryCardTitle');
+        const btnDeleteDiary = document.getElementById('btnDeleteDiary');
+        
+        const moodSelector = document.getElementById('moodSelector');
+        const diaryTitleInput = document.getElementById('diaryTitle');
+        const diaryContentInput = document.getElementById('diaryContent');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const btnRemoveImage = document.getElementById('btnRemoveImage');
+        const uploadTrigger = document.getElementById('uploadTrigger');
+        const btnSaveDiary = document.getElementById('btnSaveDiary');
+
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+        const searchCount = document.getElementById('searchCount');
+        const searchPlaceholder = document.getElementById('searchPlaceholder');
+
+        const btnBackup = document.getElementById('btnBackup');
+        const btnRestore = document.getElementById('btnRestore');
+        const fileInput = document.getElementById('fileInput');
+
+        const customAlert = document.getElementById('customAlert');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertIcon = document.getElementById('alertIcon');
+        const alertIconBg = document.getElementById('alertIconBg');
+        const btnAlertConfirm = document.getElementById('btnAlertConfirm');
+        const btnAlertCancel = document.getElementById('btnAlertCancel');
+
+        // --- 3. 커스텀 모달 알림창 구현 ---
+        let alertCallback = null;
+        let alertCancelCallback = null;
+
+        function showAlert(message, title = '알림', type = 'info', showCancel = false, onConfirm = null, onCancel = null) {
+            alertTitle.innerText = title;
+            alertMessage.innerText = message;
+            alertCallback = onConfirm;
+            alertCancelCallback = onCancel;
+
+            // 타입별 스타일셋 적용
+            if (type === 'danger') {
+                alertIconBg.className = "p-2 rounded-xl bg-red-50 text-red-600";
+                alertIcon.setAttribute('data-lucide', 'alert-triangle');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-md transition-colors";
+            } else if (type === 'success') {
+                alertIconBg.className = "p-2 rounded-xl bg-emerald-50 text-emerald-600";
+                alertIcon.setAttribute('data-lucide', 'check-circle');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-colors";
+            } else {
+                alertIconBg.className = "p-2 rounded-xl bg-indigo-50 text-indigo-600";
+                alertIcon.setAttribute('data-lucide', 'info');
+                btnAlertConfirm.className = "px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-colors";
+            }
+
+            if (showCancel) {
+                btnAlertCancel.classList.remove('hidden');
+            } else {
+                btnAlertCancel.classList.add('hidden');
+            }
+
+            lucide.createIcons();
+
+            customAlert.classList.remove('opacity-0', 'pointer-events-none');
+            customAlert.querySelector('div').classList.remove('scale-95');
+            customAlert.querySelector('div').classList.add('scale-100');
+        }
+
+        function closeAlert() {
+            customAlert.classList.add('opacity-0', 'pointer-events-none');
+            customAlert.querySelector('div').classList.remove('scale-100');
+            customAlert.querySelector('div').classList.add('scale-95');
+        }
+
+        btnAlertConfirm.addEventListener('click', () => {
+            closeAlert();
+            if (alertCallback) alertCallback();
+        });
+
+        btnAlertCancel.addEventListener('click', () => {
+            closeAlert();
+            if (alertCancelCallback) alertCancelCallback();
+        });
+
+
+        // --- 4. 로컬스토리지 핸들링 기능 ---
+        function loadDiaries() {
+            try {
+                const stored = localStorage.getItem('haru_diaries');
+                diaries = stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                console.error("데이터 로드 에러:", e);
+                showAlert("저장된 데이터를 읽어오는 중 문제가 발생했습니다.", "오류", "danger");
+                diaries = {};
+            }
+        }
+
+        function saveDiariesToStorage() {
+            try {
+                localStorage.setItem('haru_diaries', JSON.stringify(diaries));
+                renderCalendar();
+                updateSearch();
+            } catch (e) {
+                console.error("데이터 저장 에러:", e);
+                showAlert("용량 초과 등의 이유로 데이터를 저장하지 못했습니다.", "저장 실패", "danger");
+            }
+        }
+
+
+        // --- 5. 날짜 포맷팅 유틸리티 ---
+        function formatDateString(year, month, date) {
+            const mm = String(month + 1).padStart(2, '0');
+            const dd = String(date).padStart(2, '0');
+            return `${year}-${mm}-${dd}`;
+        }
+
+        function getKoreanDayName(year, month, date) {
+            const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const dayIdx = new Date(year, month, date).getDay();
+            return days[dayIdx];
+        }
+
+
+        // --- 6. 달력 그리기 ---
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            calendarTitle.innerText = `${year}년 ${month + 1}월`;
+
+            // 이번 달 시작일 요일 및 전체 일수 구하기
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            
+            // 이전 달의 마지막 일수
+            const prevLastDate = new Date(year, month, 0).getDate();
+
+            let daysHTML = "";
+
+            // 1. 이전 달 날짜 채우기 (빈 칸 채움)
+            for (let i = firstDayIndex; i > 0; i--) {
+                const day = prevLastDate - i + 1;
+                daysHTML += `
+                    <div class="h-14 p-1 text-slate-300 text-xs flex flex-col justify-between border border-transparent select-none cursor-not-allowed">
+                        <span>${day}</span>
+                    </div>
+                `;
+            }
+
+            // 2. 이번 달 실제 날짜 채우기
+            const today = new Date();
+            for (let day = 1; day <= lastDate; day++) {
+                const dateStr = formatDateString(year, month, day);
+                const hasDiary = !!diaries[dateStr];
+                const diaryObj = diaries[dateStr];
+                
+                const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+                const isSelected = selectedDateStr === dateStr;
+
+                // 스타일 분기 처리
+                let borderStyle = isSelected ? 'border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/10' : 'border-slate-100 hover:border-slate-300';
+                let textStyle = "text-slate-700 font-medium";
+                
+                const dayOfWeek = new Date(year, month, day).getDay();
+                if (dayOfWeek === 0) textStyle = "text-rose-500 font-medium"; // 일요일
+                if (dayOfWeek === 6) textStyle = "text-blue-500 font-medium";  // 토요일
+
+                let todayBadge = "";
+                if (isToday) {
+                    todayBadge = `<span class="inline-flex w-5 h-5 items-center justify-center bg-indigo-600 text-white text-[10px] rounded-full font-bold">오늘</span>`;
+                    // 오늘인데 스타일이 일반적일 경우 숫자 교체용
+                }
+
+                // 감정이 있는 경우 달력 상의 표시 아이콘 설정
+                let moodIndicator = "";
+                if (hasDiary && diaryObj.mood && MOODS[diaryObj.mood]) {
+                    moodIndicator = `
+                        <div class="flex items-center justify-center mt-1">
+                            <span class="text-base" title="${MOODS[diaryObj.mood].label}">${MOODS[diaryObj.mood].emoji}</span>
+                        </div>
+                    `;
+                } else if (hasDiary) {
+                    // 기분이 지정 안 된 일반 일기인 경우 작은 점 표시
+                    moodIndicator = `
+                        <div class="flex items-center justify-center mt-1">
+                            <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+                        </div>
+                    `;
+                }
+
+                daysHTML += `
+                    <div data-date="${dateStr}" class="h-16 p-1 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${borderStyle} ${isToday ? 'bg-indigo-50/20' : 'bg-white'}" onclick="selectDate('${dateStr}')">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs ${textStyle} ${isToday ? 'hidden' : ''}">${day}</span>
+                            ${isToday ? todayBadge : ''}
+                        </div>
+                        ${moodIndicator}
+                    </div>
+                `;
+            }
+
+            // 3. 다음 달 날짜 채우기 (끝부분 채움)
+            const totalCells = firstDayIndex + lastDate;
+            const nextDaysNeeded = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+            for (let i = 1; i <= nextDaysNeeded; i++) {
+                daysHTML += `
+                    <div class="h-14 p-1 text-slate-300 text-xs flex flex-col justify-between border border-transparent select-none cursor-not-allowed">
+                        <span>${i}</span>
+                    </div>
+                `;
+            }
+
+            calendarDays.innerHTML = daysHTML;
+        }
+
+
+        // --- 7. 특정 날짜 선택 및 일기 조회/작성 폼 갱신 ---
+        window.selectDate = function(dateStr) {
+            selectedDateStr = dateStr;
+            
+            // 기존 달력 리렌더링하여 선택 보더라인 표시 변경
+            renderCalendar();
+
+            // 날짜 파싱하여 라벨에 표기
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const formattedLabel = `${y}년 ${m}월 ${d}일 (${getKoreanDayName(y, m-1, d)})`;
+            selectedFullDate.innerText = formattedLabel;
+
+            const existingDiary = diaries[dateStr];
+
+            // 폼 리셋 및 초기 세팅
+            resetDiaryForm();
+
+            if (existingDiary) {
+                // 기존 일기가 있을 때 (조회 및 수정 모드)
+                diaryCardTitle.innerText = "일기 읽고 수정하기";
+                diaryTitleInput.value = existingDiary.title;
+                diaryContentInput.value = existingDiary.content;
+                
+                // 기분 선택 복원
+                if (existingDiary.mood) {
+                    selectMoodOption(existingDiary.mood);
+                }
+
+                // 이미지 로드 복원
+                if (existingDiary.image) {
+                    attachedImageBase64 = existingDiary.image;
+                    imagePreview.src = existingDiary.image;
+                    imagePreviewContainer.classList.remove('hidden');
+                    uploadTrigger.classList.add('hidden');
+                }
+
+                btnDeleteDiary.classList.remove('hidden');
+                btnSaveDiary.querySelector('span').innerText = "일기 수정하기";
+            } else {
+                // 일기가 없을 때 (새 일기 작성 모드)
+                diaryCardTitle.innerText = "오늘의 일기 쓰기";
+                btnDeleteDiary.classList.add('hidden');
+                btnSaveDiary.querySelector('span').innerText = "일기 저장하기";
+            }
+
+            // 스크롤 포커스를 에디터로 (모바일 환경 배려)
+            if (window.innerWidth < 1024) {
+                diaryCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+
+        function resetDiaryForm() {
+            diaryForm.reset();
+            selectedMood = "";
+            attachedImageBase64 = "";
+            
+            // Mood Selector 보더라인 및 효과 복원
+            const buttons = moodSelector.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.className = "flex flex-col items-center p-2 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 transition-all text-2xl group";
+                btn.querySelector('span:last-child').className = "text-[10px] text-slate-400 mt-1 font-medium";
+            });
+
+            // 이미지 업로드 부분 초기화
+            imagePreview.src = "";
+            imagePreviewContainer.classList.add('hidden');
+            uploadTrigger.classList.remove('hidden');
+            imageInput.value = "";
+        }
+
+        function selectMoodOption(moodKey) {
+            selectedMood = moodKey;
+            const buttons = moodSelector.querySelectorAll('button');
+            
+            buttons.forEach(btn => {
+                const btnMood = btn.getAttribute('data-mood');
+                if (btnMood === moodKey) {
+                    const moodTheme = MOODS[moodKey];
+                    btn.className = `flex flex-col items-center p-2 rounded-xl border-2 ${moodTheme.border} ${moodTheme.bg} transition-all scale-105 text-2xl shadow-sm`;
+                    btn.querySelector('span:last-child').className = "text-[10px] text-slate-900 font-bold mt-1";
+                } else {
+                    btn.className = "flex flex-col items-center p-2 rounded-xl border border-slate-100 opacity-50 hover:opacity-100 transition-all text-2xl group";
+                    btn.querySelector('span:last-child').className = "text-[10px] text-slate-400 mt-1 font-medium";
+                }
+            });
+        }
+
+        // Mood 버튼 클릭 이벤트 부착
+        moodSelector.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', () => {
+                const moodKey = button.getAttribute('data-mood');
+                selectMoodOption(moodKey);
+            });
+        });
+
+
+        // --- 8. 이미지 처리 (FileReader 로 로컬 이미지 Base64 인코딩) ---
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 파일 용량 제한 (약 1.5MB 미만 제한, 로컬스토리지 전체 한도 5MB 내외 대비)
+            if (file.size > 1.5 * 1024 * 1024) {
+                showAlert("저장 용량 관리를 위해 1.5MB 이하의 사진만 등록 가능합니다.", "이미지 용량 초과", "danger");
+                imageInput.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                attachedImageBase64 = evt.target.result;
+                imagePreview.src = attachedImageBase64;
+                imagePreviewContainer.classList.remove('hidden');
+                uploadTrigger.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        btnRemoveImage.addEventListener('click', function() {
+            attachedImageBase64 = "";
+            imagePreview.src = "";
+            imagePreviewContainer.classList.add('hidden');
+            uploadTrigger.classList.remove('hidden');
+            imageInput.value = "";
+        });
+
+
+        // --- 9. 일기 저장 기능 ---
+        diaryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (!selectedDateStr) {
+                showAlert("달력에서 날짜를 먼저 선택해 주세요.", "안내", "info");
+                return;
+            }
+
+            const title = diaryTitleInput.value.trim();
+            const content = diaryContentInput.value.trim();
+
+            if (!title || !content) {
+                showAlert("제목과 일기 내용을 모두 입력해 주세요.", "입력 확인", "info");
+                return;
+            }
+
+            // 기분 유효성 보완 (미지정시 선택 안내 또는 임의 저장 가능)
+            if (!selectedMood) {
+                // 선택 안한 경우 디폴트로 보관 가능하지만 권장
+                selectedMood = "neutral";
+            }
+
+            // 데이터 객체 적재
+            diaries[selectedDateStr] = {
+                title: title,
+                content: content,
+                mood: selectedMood,
+                image: attachedImageBase64,
+                date: selectedDateStr,
+                updatedAt: new Date().toISOString()
+            };
+
+            saveDiariesToStorage();
+            showAlert("오늘의 소중한 일기를 안전하게 저장했습니다.", "기록 완료", "success");
+            
+            // UI 초기화 및 현 상태 유지
+            selectDate(selectedDateStr);
+        });
+
+
+        // --- 10. 일기 삭제 기능 ---
+        btnDeleteDiary.addEventListener('click', function() {
+            if (!selectedDateStr || !diaries[selectedDateStr]) return;
+
+            showAlert(
+                `${selectedDateStr}의 일기를 정말 삭제하시겠습니까? 삭제된 기록은 되돌릴 수 없습니다.`,
+                "일기 삭제",
+                "danger",
+                true,
+                () => {
+                    // 삭제 확인 시
+                    delete diaries[selectedDateStr];
+                    saveDiariesToStorage();
+                    resetDiaryForm();
+                    
+                    // 새 작성 상태로 전환
+                    diaryCardTitle.innerText = "오늘의 일기 쓰기";
+                    btnDeleteDiary.classList.add('hidden');
+                    btnSaveDiary.querySelector('span').innerText = "일기 저장하기";
+                    
+                    showAlert("일기가 성공적으로 삭제되었습니다.", "삭제 성공", "success");
+                }
+            );
+        });
+
+
+        // --- 11. 일기 검색 엔진 구현 ---
+        function updateSearch() {
+            const query = searchInput.value.trim().toLowerCase();
+            const resultsContainer = document.getElementById('searchResults');
+
+            if (!query) {
+                searchResults.classList.add('hidden');
+                searchPlaceholder.classList.remove('hidden');
+                searchCount.classList.add('hidden');
+                return;
+            }
+
+            const filtered = Object.values(diaries).filter(item => {
+                const matchTitle = item.title.toLowerCase().includes(query);
+                const matchContent = item.content.toLowerCase().includes(query);
+                
+                // 감정 이름 매칭
+                const moodObj = MOODS[item.mood];
+                const matchMood = moodObj ? moodObj.label.includes(query) : false;
+
+                return matchTitle || matchContent || matchMood;
+            });
+
+            // 내림차순 정렬 (최신순)
+            filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (filtered.length > 0) {
+                searchCount.innerText = `${filtered.length}개의 일기`;
+                searchCount.classList.remove('hidden');
+                searchPlaceholder.classList.add('hidden');
+                searchResults.classList.remove('hidden');
+
+                let html = "";
+                filtered.forEach(item => {
+                    const moodDetail = MOODS[item.mood] || { emoji: '✏️', label: '' };
+                    html += `
+                        <div class="p-3 bg-slate-50 hover:bg-indigo-50/40 border border-slate-100 hover:border-indigo-100 rounded-xl cursor-pointer transition-all flex items-center justify-between" onclick="selectDate('${item.date}')">
+                            <div class="flex-grow min-w-0 pr-3">
+                                <span class="text-[10px] text-indigo-500 font-bold block mb-0.5">${item.date}</span>
+                                <h4 class="text-sm font-semibold text-slate-800 truncate">${item.title}</h4>
+                                <p class="text-xs text-slate-400 truncate mt-0.5">${item.content}</p>
+                            </div>
+                            <div class="flex flex-col items-center flex-shrink-0 bg-white p-2 rounded-lg border border-slate-100 shadow-sm min-w-[40px]">
+                                <span class="text-lg">${moodDetail.emoji}</span>
+                                <span class="text-[9px] text-slate-400 mt-0.5 font-medium">${moodDetail.label}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                resultsContainer.innerHTML = html;
+            } else {
+                searchCount.innerText = `0개의 결과`;
+                searchCount.classList.remove('hidden');
+                searchResults.classList.add('hidden');
+                searchPlaceholder.innerHTML = `<div class="text-center py-4 text-slate-400">"${query}"에 해당하는 일기가 없습니다.</div>`;
+                searchPlaceholder.classList.remove('hidden');
+            }
+        }
+
+        searchInput.addEventListener('input', updateSearch);
+
+
+        // --- 12. 백업 (내보내기) / 복원 (가져오기) ---
+        btnBackup.addEventListener('click', function() {
+            if (Object.keys(diaries).length === 0) {
+                showAlert("저장된 일기가 없어 백업 파일을 생성할 수 없습니다.", "백업 불가", "info");
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(diaries));
+            const downloadAnchor = document.createElement('a');
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `haru_diary_backup_${todayStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            
+            showAlert("백업 파일이 생성되었습니다. 컴퓨터에 안전하게 보관해 주세요.", "백업 성공", "success");
+        });
+
+        btnRestore.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    
+                    // 간단한 형식 검증
+                    if (typeof parsed !== 'object' || parsed === null) {
+                        throw new Error("유효하지 않은 구조입니다.");
+                    }
+
+                    showAlert(
+                        "새 데이터로 복원하면 현재 작성된 모든 일기가 덮어쓰기됩니다. 계속 진행하시겠습니까?",
+                        "데이터 복원 경고",
+                        "danger",
+                        true,
+                        () => {
+                            // 확인 시 복원
+                            diaries = parsed;
+                            saveDiariesToStorage();
+                            renderCalendar();
+                            updateSearch();
+                            resetDiaryForm();
+                            
+                            // 기본 오늘 날짜 재선택
+                            const todayStr = formatDateString(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+                            selectDate(todayStr);
+
+                            showAlert("모든 일기 데이터가 무사히 복원되었습니다.", "복원 성공", "success");
+                        }
+                    );
+
+                } catch (err) {
+                    showAlert("올바른 백업 JSON 파일이 아닙니다.", "가져오기 실패", "danger");
+                }
+            };
+            reader.readAsText(file);
+            fileInput.value = ""; // 파일 선택기 초기화
+        });
+
+
+        // --- 13. 달력 컨트롤 버튼 리스너 ---
+        btnPrevMonth.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        btnNextMonth.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        btnToday.addEventListener('click', () => {
+            currentDate = new Date();
+            renderCalendar();
+            const todayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+            selectDate(todayStr);
+        });
+
+
+        // --- 14. 초기 실행부 ---
+        window.onload = function() {
+            lucide.createIcons();
+            loadDiaries();
+            renderCalendar();
+            
+            // 오늘 날짜로 에디터 자동 시작
+            const today = new Date();
+            const todayStr = formatDateString(today.getFullYear(), today.getMonth(), today.getDate());
+            selectDate(todayStr);
+        };
+    </script>
+</body>
+</html>
